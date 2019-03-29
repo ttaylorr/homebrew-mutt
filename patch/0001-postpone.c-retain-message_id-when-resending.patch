@@ -1,4 +1,4 @@
-From 0167deb67216e3237f73facd00d268b2bd274ab6 Mon Sep 17 00:00:00 2001
+From 5212b96b92a309450acf2d708e68651503d3018a Mon Sep 17 00:00:00 2001
 From: Taylor Blau <me@ttaylorr.com>
 Date: Sat, 21 Apr 2018 10:06:06 -0700
 Subject: [PATCH] postpone.c: retain message_id when resending
@@ -8,10 +8,10 @@ Subject: [PATCH] postpone.c: retain message_id when resending
  1 file changed, 1 insertion(+), 5 deletions(-)
 
 diff --git a/postpone.c b/postpone.c
-index 7c5ca5b8..6ad823bd 100644
+index 8e78bade..2e5b2cf5 100644
 --- a/postpone.c
 +++ b/postpone.c
-@@ -575,13 +575,9 @@ int mutt_prepare_template (FILE *fp, CONTEXT *ctx, HEADER *newhdr, HEADER *hdr,
+@@ -576,13 +576,9 @@ int mutt_prepare_template (FILE *fp, CONTEXT *ctx, HEADER *newhdr, HEADER *hdr,
    newhdr->content->length = hdr->content->length;
    mutt_parse_part (fp, newhdr->content);
  
@@ -27,5 +27,5 @@ index 7c5ca5b8..6ad823bd 100644
    }
  
 -- 
-2.17.0
+2.20.1
 

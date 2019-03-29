@@ -10,36 +10,30 @@
 class Mutt < Formula
   desc "Mongrel of mail user agents (part elm, pine, mush, mh, etc.)"
   homepage "http://www.mutt.org/"
-  url "https://bitbucket.org/mutt/mutt/downloads/mutt-1.9.5.tar.gz"
-  mirror "http://ftp.mutt.org/pub/mutt/mutt-1.9.5.tar.gz"
-  sha256 "bf617e64ae4e08a998bef8e42a965a211587e051f1437a3a4884b351a9385753"
+  url "https://bitbucket.org/mutt/mutt/downloads/mutt-1.11.4.tar.gz"
+  sha256 "b651357ea6c8762178080493991c77ecb111d916d171d422500257ab48be2801"
 
   bottle do
-    sha256 "34f2d81ebe67fe3049a22a9ee31111575c708db2307b974bfaa046af4a2bcbdf" => :high_sierra
-    sha256 "96e72bfbfcc89e66037b98cf1d6a262d697e99a9c18a6d3390864a97f91c4593" => :sierra
-    sha256 "062df74d0def4530f280ca9a9affe82d819ba73f076de164262b152ecc83e7ce" => :el_capitan
+    sha256 "97670ca1fcd312b643feab03a2c5394d31a5e64ad2c87ccbb1f0aaf7d2b0e043" => :mojave
+    sha256 "3930e0247de8fdf7b4c4c0cc246b5c501f255bed8050f82d85262ef0aa6f4f11" => :high_sierra
+    sha256 "a48c9125b61c717c557cc0e1520cb367d39362382ff99787ccd6d3670ef40ceb" => :sierra
   end
 
   head do
     url "https://gitlab.com/muttmua/mutt.git"
 
     resource "html" do
-      url "https://dev.mutt.org/doc/manual.html", :using => :nounzip
+      url "https://muttmua.gitlab.io/mutt/manual-dev.html"
     end
   end
 
-  option "with-debug", "Build with debug option enabled"
-  option "with-s-lang", "Build against slang instead of ncurses"
-  option "with-retain-messageid", "Build with messageid retaining patch"
-
   depends_on "autoconf" => :build
   depends_on "automake" => :build
+  depends_on "gpgme"
   depends_on "openssl"
   depends_on "tokyo-cabinet"
-  depends_on "gettext" => :optional
-  depends_on "gpgme" => :optional
-  depends_on "libidn" => :optional
-  depends_on "s-lang" => :optional
+
+  option "with-retain-messageid"
 
   conflicts_with "tin",
     :because => "both install mmdf.5 and mbox.5 man pages"
@@ -50,37 +44,25 @@ class Mutt < Formula
   end if build.with? "retain-messageid"
 
   def install
-    user_admin = Etc.getgrnam("admin").mem.include?(ENV["USER"])
+    user_in_mail_group = Etc.getgrnam("mail").mem.include?(ENV["USER"])
+    effective_group = Etc.getgrgid(Process.egid).name
 
     args = %W[
       --disable-dependency-tracking
       --disable-warnings
       --prefix=#{prefix}
-      --with-ssl=#{Formula["openssl"].opt_prefix}
-      --with-sasl
-      --with-gss
-      --enable-imap
-      --enable-smtp
-      --enable-pop
+      --enable-debug
       --enable-hcache
-      --with-tokyocabinet
+      --enable-imap
+      --enable-pop
       --enable-sidebar
+      --enable-smtp
+      --with-gss
+      --with-sasl
+      --with-ssl=#{Formula["openssl"].opt_prefix}
+      --with-tokyocabinet
+      --enable-gpgme
     ]
-
-    # This is just a trick to keep 'make install' from trying
-    # to chgrp the mutt_dotlock file (which we can't do if
-    # we're running as an unprivileged user)
-    args << "--with-homespool=.mbox" unless user_admin
-
-    args << "--disable-nls" if build.without? "gettext"
-    args << "--enable-gpgme" if build.with? "gpgme"
-    args << "--with-slang" if build.with? "s-lang"
-
-    if build.with? "debug"
-      args << "--enable-debug"
-    else
-      args << "--disable-debug"
-    end
 
     system "./prepare", *args
     system "make"
@@ -88,15 +70,30 @@ class Mutt < Formula
     # This permits the `mutt_dotlock` file to be installed under a group
     # that isn't `mail`.
     # https://github.com/Homebrew/homebrew/issues/45400
-    if user_admin
-      inreplace "Makefile", /^DOTLOCK_GROUP =.*$/, "DOTLOCK_GROUP = admin"
+    unless user_in_mail_group
+      inreplace "Makefile", /^DOTLOCK_GROUP =.*$/, "DOTLOCK_GROUP = #{effective_group}"
     end
 
     system "make", "install"
     doc.install resource("html") if build.head?
   end
 
+  def caveats; <<~EOS
+    mutt_dotlock(1) has been installed, but does not have the permissions lock
+    spool files in /var/mail. To grant the necessary permissions, run
+
+      sudo chgrp mail #{bin}/mutt_dotlock
+      sudo chmod g+s #{bin}/mutt_dotlock
+
+    Alternatively, you may configure `spoolfile` in your .muttrc to a file inside
+    your home directory.
+  EOS
+  end
+
   test do
     system bin/"mutt", "-D"
+    touch "foo"
+    system bin/"mutt_dotlock", "foo"
+    system bin/"mutt_dotlock", "-u", "foo"
   end
 end
