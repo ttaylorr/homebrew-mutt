@@ -42,7 +42,7 @@ class Mutt < Formula
 
   patch do
     url "https://raw.githubusercontent.com/ttaylorr/homebrew-mutt/master/patch/0001-postpone.c-retain-message_id-when-resending.patch"
-    sha256 "0e0c6287731d12b1ca8e7481784cffe4d1b77023568c12ee9d8cff74ff0a8024"
+    sha256 "ec9910670d48ae62f89b2d51131f3e5a5e1d93fc22fb466ab4452a869f9143f4"
   end
 
   patch do
