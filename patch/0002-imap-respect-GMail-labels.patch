@@ -1,0 +1,96 @@
+From 383a25ab246cb227e9bc516df01aabe0990636af Mon Sep 17 00:00:00 2001
+From: Taylor Blau <me@ttaylorr.com>
+Date: Tue, 7 Apr 2020 10:23:49 -0600
+Subject: [PATCH 2/2] imap: respect GMail labels
+
+Originally from:
+
+  https://github.com/sgeb/homebrew-mutt/blob/master/patches/mutt-1.5.23-gmail-labels.sgeb.v1.patch.
+---
+ imap/message.c | 41 ++++++++++++++++++++++++++++++++++++++++-
+ imap/message.h |  3 +++
+ 2 files changed, 43 insertions(+), 1 deletion(-)
+
+diff --git a/imap/message.c b/imap/message.c
+index 56b44f05..0bfaf344 100644
+--- a/imap/message.c
++++ b/imap/message.c
+@@ -788,7 +788,7 @@ static int read_headers_fetch_new (IMAP_DATA *idata, unsigned int msn_begin,
+          imap_fetch_msn_seqset (b, idata, evalhc, msn_begin, msn_end,
+                                 &fetch_msn_end))
+   {
+-    safe_asprintf (&cmd, "FETCH %s (UID FLAGS INTERNALDATE RFC822.SIZE %s)",
++    safe_asprintf (&cmd, "FETCH %s (UID FLAGS INTERNALDATE RFC822.SIZE X-GM-LABELS %s)",
+                    mutt_b2s (b), hdrreq);
+     imap_cmd_start (idata, cmd);
+     FREE (&cmd);
+@@ -873,6 +873,7 @@ static int read_headers_fetch_new (IMAP_DATA *idata, unsigned int msn_begin,
+                                                        0, 0);
+         /* content built as a side-effect of mutt_read_rfc822_header */
+         ctx->hdrs[idx]->content->length = h.content_length;
++        ctx->hdrs[idx]->env->x_label = h.data->labels;
+         ctx->size += h.content_length;
+ 
+ #if USE_HCACHE
+@@ -1769,6 +1770,44 @@ static int msg_parse_fetch (IMAP_HEADER *h, char *s)
+   {
+     SKIPWS (s);
+ 
++    if (ascii_strncasecmp ("X-GM-LABELS", s, 11) == 0)
++    {
++        s += 11;
++        SKIPWS (s);
++        ptmp = tmp;
++        s++; /* skip ( */
++        while (*s && *s != ')')
++        {
++            if (ptmp-tmp == sizeof(tmp)/sizeof(char))
++              s++;
++            else if (ascii_strncasecmp ("\"\\\\Important\"", s, 13) == 0)
++            {
++              s += 13;
++              SKIPWS (s);
++            }
++            else if (ascii_strncasecmp ("\"\\\\Starred\"", s, 11) == 0)
++            {
++              s += 11;
++              SKIPWS (s);
++            }
++            else if (ascii_strncasecmp ("\"\\\\", s, 3) == 0)
++              s += 3;
++            else if (ascii_strncasecmp ("\"", s, 1) == 0)
++              s++;
++            else
++              *ptmp++ = *s++;
++
++            if (*s == ')' && *(ptmp-1) == ' ')
++              ptmp--;
++        }
++        if (*s != ')')
++            return -1;
++        s++; /* skip ) */
++        *ptmp = 0;
++        h->data->labels = safe_strdup(tmp);
++        SKIPWS (s);
++    }
++
+     if (ascii_strncasecmp ("FLAGS", s, 5) == 0)
+     {
+       if ((s = msg_parse_flags (h, s)) == NULL)
+diff --git a/imap/message.h b/imap/message.h
+index 11b549fd..a3fc3815 100644
+--- a/imap/message.h
++++ b/imap/message.h
+@@ -37,6 +37,9 @@ typedef struct imap_header_data
+ 
+   unsigned int uid;	/* 32-bit Message UID */
+   unsigned int msn;     /* Message Sequence Number */
++
++  char *labels;
++
+   LIST *keywords;
+ } IMAP_HEADER_DATA;
+ 
+-- 
+2.26.0.106.g9fadedd637
+
