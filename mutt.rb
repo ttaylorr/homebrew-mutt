@@ -10,13 +10,13 @@
 class Mutt < Formula
   desc "Mongrel of mail user agents (part elm, pine, mush, mh, etc.)"
   homepage "http://www.mutt.org/"
-  url "https://bitbucket.org/mutt/mutt/downloads/mutt-1.11.4.tar.gz"
-  sha256 "b651357ea6c8762178080493991c77ecb111d916d171d422500257ab48be2801"
+  url "https://bitbucket.org/mutt/mutt/downloads/mutt-1.13.5.tar.gz"
+  sha256 "6cd71b5b3e6b255afef6bed3b5e1e8ee9819b3d7c9839fd95e798045882aa653"
 
   bottle do
-    sha256 "97670ca1fcd312b643feab03a2c5394d31a5e64ad2c87ccbb1f0aaf7d2b0e043" => :mojave
-    sha256 "3930e0247de8fdf7b4c4c0cc246b5c501f255bed8050f82d85262ef0aa6f4f11" => :high_sierra
-    sha256 "a48c9125b61c717c557cc0e1520cb367d39362382ff99787ccd6d3670ef40ceb" => :sierra
+    sha256 "3bcdd2904f7a76d195020188134d9b4566a3d905f43e70a2041c684e6fa9bce3" => :catalina
+    sha256 "64fcaf845a5dc2500e73cc6ae1988679ce139b1573d07b6d899a804d4033382a" => :mojave
+    sha256 "0bdcaa2f901111df911aeebb4b69b67f8907a614b3187d12f82aca17c07bd744" => :high_sierra
   end
 
   head do
@@ -30,18 +30,25 @@ class Mutt < Formula
   depends_on "autoconf" => :build
   depends_on "automake" => :build
   depends_on "gpgme"
-  depends_on "openssl"
+  depends_on "openssl@1.1"
   depends_on "tokyo-cabinet"
 
-  option "with-retain-messageid"
+  uses_from_macos "bzip2"
+  uses_from_macos "ncurses"
+  uses_from_macos "zlib"
 
   conflicts_with "tin",
     :because => "both install mmdf.5 and mbox.5 man pages"
 
   patch do
     url "https://raw.githubusercontent.com/ttaylorr/homebrew-mutt/master/patch/0001-postpone.c-retain-message_id-when-resending.patch"
-    sha256 "28d754ab1583286c74277c42d5fd702415cc54a425eee7afeadd58cfb8384567"
-  end if build.with? "retain-messageid"
+    sha256 "0e0c6287731d12b1ca8e7481784cffe4d1b77023568c12ee9d8cff74ff0a8024"
+  end
+
+  patch do
+    url "https://raw.githubusercontent.com/ttaylorr/homebrew-mutt/master/patch/0002-imap-respect-GMail-labels.patch"
+    sha256 "b1ed46572e3f52ab7cc825db9533b38e4e1db5453f39984ddfabc128e4314693"
+  end
 
   def install
     user_in_mail_group = Etc.getgrnam("mail").mem.include?(ENV["USER"])
@@ -59,7 +66,7 @@ class Mutt < Formula
       --enable-smtp
       --with-gss
       --with-sasl
-      --with-ssl=#{Formula["openssl"].opt_prefix}
+      --with-ssl=#{Formula["openssl@1.1"].opt_prefix}
       --with-tokyocabinet
       --enable-gpgme
     ]
@@ -70,24 +77,23 @@ class Mutt < Formula
     # This permits the `mutt_dotlock` file to be installed under a group
     # that isn't `mail`.
     # https://github.com/Homebrew/homebrew/issues/45400
-    unless user_in_mail_group
-      inreplace "Makefile", /^DOTLOCK_GROUP =.*$/, "DOTLOCK_GROUP = #{effective_group}"
-    end
+    inreplace "Makefile", /^DOTLOCK_GROUP =.*$/, "DOTLOCK_GROUP = #{effective_group}" unless user_in_mail_group
 
     system "make", "install"
     doc.install resource("html") if build.head?
   end
 
-  def caveats; <<~EOS
-    mutt_dotlock(1) has been installed, but does not have the permissions lock
-    spool files in /var/mail. To grant the necessary permissions, run
+  def caveats
+    <<~EOS
+      mutt_dotlock(1) has been installed, but does not have the permissions lock
+      spool files in /var/mail. To grant the necessary permissions, run
 
-      sudo chgrp mail #{bin}/mutt_dotlock
-      sudo chmod g+s #{bin}/mutt_dotlock
+        sudo chgrp mail #{bin}/mutt_dotlock
+        sudo chmod g+s #{bin}/mutt_dotlock
 
-    Alternatively, you may configure `spoolfile` in your .muttrc to a file inside
-    your home directory.
-  EOS
+      Alternatively, you may configure `spoolfile` in your .muttrc to a file inside
+      your home directory.
+    EOS
   end
 
   test do
